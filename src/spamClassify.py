@@ -10,7 +10,7 @@ from spam.extraFunction import spamBayes
 
 
 # 加载自定义对象，以便使用定义好的函数
-spam = spamBayes();
+spam = spamBayes()
 
 # 文件路径
 train_path = r'..\data\train\Data'
@@ -24,9 +24,9 @@ stopList = spam.getStopWords() + exclude_words
 
 trainFileList = [] # 存储训练集邮件路径
 wordTable = [] # 存放整个训练集中提出来的所有主题词
-i = 1
 
 # 提取训练集里所有邮件的路径
+print("开始提取训练集邮件路径")
 for path in os.listdir(train_path):
     secondPathList = os.listdir(os.path.join(train_path, path))
     for secondPath in secondPathList:
@@ -45,80 +45,81 @@ for trainEmail in tqdm(trainFileList):
 
 # 提取频率最高的1200个词汇
 wordNum = 1200
-wordDict = Counter(wordTable) # 统计列表中的词频，并对应成字典
-wordDict = wordDict.most_common(wordNum) # 取字典中词频最高的N项
+wordDictList = Counter(wordTable) # 统计列表中的词频，并对应成字典
+wordDictList = wordDictList.most_common(wordNum) # 取字典中词频最高的N项
 
 # 构造训练集的特征矩阵
 print("开始构造训练集的特征矩阵")
-train_matrix = np.zeros((len(trainFileList), wordNum))
-mailIndex = 0
-
-for trainEmail in tqdm(trainFileList):
+trainData = np.zeros((len(trainFileList), wordNum))
+for mailIndex, trainEmail in enumerate(tqdm(trainFileList)):
     mail2Str = open(trainEmail, encoding='gb18030').read()
+    # 在每个邮件中使用tf-idf提取50个关键词，统计词频并对应生成D维特征
     keyWords = analyse.extract_tags(mail2Str, topK=50, withWeight=False)
     for keyWord in keyWords:
-        wordId = 0
-        for index, word in enumerate(wordDict):
+        for featureIndex, word in enumerate(wordDictList):
             if word[0] == keyWord:
-                wordId = index
-                train_matrix[mailIndex][wordId] = keyWords.count(keyWord)
-    mailIndex += 1 
+                trainData[mailIndex][featureIndex] = keyWords.count(keyWord)
 
-# 制作训练样本的标签集合
+# 生成训练集对应的标签
 f = open(index_path)
-print(f.readline)#next(f)
+print(f.readline()) # 舍弃第一行
 train_label = np.zeros(len(trainFileList))
-i = 0
-for label in train_label:
-    s = f.readline()
-    if s[:3] == 'ham':
-        train_label[i] = 1
-    i += 1
-
-# 加载朴素贝叶斯分类器
-naiveBayes = MultinomialNB()
-# 保存训练特征和训练标签
-np.save(r'C:\Users\Administrator\Desktop\SpamClassfier\MySpamBayes\classify1.py\train_matrix', train_matrix)
-np.save(r'C:\Users\Administrator\Desktop\SpamClassfier\MySpamBayes\classify1.py\train_label', train_label)
-# 训练模型
-naiveBayes.fit(train_matrix, train_label)
-
-# 得到测试数据
-trainFileList.clear()
-for f1 in os.listdir(test_path):
-    test_dir = os.path.join(test_path, f1)
-    trainFileList += [os.path.join(test_dir, f2) for f2 in os.listdir(test_dir)]
-
-test_matrix = np.zeros((len(trainFileList), wordNum))
-mailIndex = 0
-for trainEmail in tqdm(trainFileList):
+line = f.readline()
+fileIndex = 0
+while line:
+    label, secondPath = line.split(" ")
     try:
-        f = open(trainEmail, encoding='gb18030').read()
-    except UnicodeDecodeError:
-        print("wrong trainEmail:" + trainEmail)
-    
-    keyWords = analyse.extract_tags(f, 50, withWeight = False)
+        open(os.path.join(train_path[:-5], secondPath[2:]))
+    except FileNotFoundError:
+        print("未找到该文件，已跳过，路径：", secondPath[2:])
+    else:
+        if label == 'ham':
+            train_label[fileIndex] = 1
+        elif label == 'spam':
+            train_label[fileIndex] = 0
+        fileIndex += 1
+f.close()
+
+# 保存训练特征和训练标签
+np.save(r'../save', trainData)
+np.save(r'../save', train_label)
+
+# 加载和训练朴素贝叶斯分类器
+naiveBayes = MultinomialNB()
+naiveBayes.fit(trainData, train_label)
+
+# 获取测试集里所有文件的路径列表
+print("正在获取测试集文件路径")
+testFileList = []
+for path in os.listdir(test_path):
+    secondPathList = os.listdir(os.path.join(test_path, path))
+    for secondPath in secondPathList:
+        testFileList.append(os.path.join(test_path, path, secondPath))
+
+# 构建测试集的特征矩阵
+print("开始构造训练集的特征矩阵")
+testData = np.zeros((len(testFileList), wordNum))
+for mailIndex, testEmail in enumerate(tqdm(testFileList)):
+    mail2Str = open(testEmail, encoding='gb18030').read()
+    # 在每个邮件中使用tf-idf提取50个关键词，统计词频并对应生成D维特征
+    keyWords = analyse.extract_tags(mail2Str, topK=50, withWeight=False)
     for keyWord in keyWords:
-        wordId = 0
-        for index, word in enumerate(wordDict):
-            if keyWord == word[0]:
-                wordId = index
-                test_matrix[mailIndex][wordId] = keyWords.count(keyWord)
-    mailIndex += 1
+        for featureIndex, word in enumerate(wordDictList):
+            if word[0] == keyWord:
+                trainData[mailIndex][featureIndex] = keyWords.count(keyWord)
 
 # 预测
-predict = naiveBayes.predict(test_matrix)
-np.save(r'C:\Users\Administrator\Desktop\SpamClassfier\MySpamBayes', predict)
+predict = naiveBayes.predict(testData)
+np.save(r'../save', predict)
 
-# 获取结果
-i = 0
-a = open('index.txt', 'w')
-a.write("TYPE ID"+"\n")
-for trainEmail in trainFileList:
-    trainEmail = "../Data/{0}/{1}".format(trainEmail.split("\\")[-2],trainEmail.split("\\")[-1])
-    if predict[i] == 1:
-        tag = 'ham {0}'.format(trainEmail)
-    else:
-        tag = 'spam {0}'.format(trainEmail)
-    i += 1
-    a.write(tag+"\n")
+# 输出result.txt文件
+print("正在写入结果文件")
+f = open(r"./result.txt", 'w')
+f.write("TYPE ID\n")
+for index, testPath in enumerate(tqdm(testFileList)):
+    firstPath, secondPath = testPath[-7:].split("\\")
+    if predict[index] == 1:
+        f.write("ham ../Data/" + firstPath + '/' + secondPath + '\n')
+    elif predict[index] == 0:
+        f.write("spam ../Data/" + firstPath + '/' + secondPath + '\n')
+f.close()
