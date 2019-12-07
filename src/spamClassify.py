@@ -44,7 +44,7 @@ for trainEmail in tqdm(trainFileList):
             wordTable.append(keyWord)
 
 # 提取频率最高的1200个词汇
-wordNum = 1200
+wordNum = 1800
 wordDictList = Counter(wordTable) # 统计列表中的词频，并对应成字典
 wordDictList = wordDictList.most_common(wordNum) # 取字典中词频最高的N项
 
@@ -68,16 +68,13 @@ line = f.readline()
 fileIndex = 0
 while line:
     label, secondPath = line.split(" ")
-    try:
-        open(os.path.join(train_path[:-5], secondPath[2:]))
-    except FileNotFoundError:
-        print("未找到该文件，已跳过，路径：", secondPath[2:])
-    else:
+    if(os.path.exists(os.path.join(train_path[:-5], secondPath[3:]))):
         if label == 'ham':
             train_label[fileIndex] = 1
         elif label == 'spam':
             train_label[fileIndex] = 0
         fileIndex += 1
+    line = f.readline()
 f.close()
 
 # 保存训练特征和训练标签

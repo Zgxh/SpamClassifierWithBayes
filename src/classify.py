@@ -57,7 +57,7 @@ for fileName in tqdm(hamFileList):
             # 过滤掉非中文字符
             rule=re.compile(r"[^\u4e00-\u9fa5]")
             line=rule.sub("", line)
-            # 将每封邮件出现的词保存在wordsList中
+            # 将每封邮件出现的词保存在wordsList中 
             spam.get_word_list(line, wordsList, stopList)
     except FileNotFoundError:
         normFilelen -= 1
